@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}编辑账号 - TG MTProto 管理后台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="mb-0 fw-bold">编辑账号</h4>
+  <small class="text-muted">{{ account.phone }}</small>
+</div>
+
+<div class="card" style="max-width:720px">
+  <div class="card-body">
+    <form method="post" action="/accounts/{{ account.id }}/edit">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label fw-medium">归属渠道 <span class="text-danger">*</span></label>
+          <select class="form-select" name="channel_id" required>
+            {% for ch in channels %}
+            <option value="{{ ch.id }}" {% if ch.id == account.channel_id %}selected{% endif %}>
+              {{ ch.name }}{% if ch.description %} — {{ ch.description }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-medium">手机号 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="phone" value="{{ account.phone }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-medium">API ID <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="api_id" value="{{ account.api_id }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-medium">API Hash <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="api_hash" value="{{ account.api_hash }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-medium">Session 名称</label>
+          <input type="text" class="form-control" name="session_name" value="{{ account.session_name }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-medium">备注</label>
+          <input type="text" class="form-control" name="note" value="{{ account.note or '' }}">
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="use_proxy" id="useProxy"
+              {% if account.use_proxy %}checked{% endif %}>
+            <label class="form-check-label fw-medium" for="useProxy">启用代理</label>
+          </div>
+        </div>
+        <div class="col-md-8 proxy-fields" {% if not account.use_proxy %}style="display:none"{% endif %}>
+          <label class="form-label fw-medium">代理地址</label>
+          <input type="text" class="form-control" name="proxy_host"
+                 value="{{ account.proxy_host or '' }}" placeholder="127.0.0.1">
+        </div>
+        <div class="col-md-4 proxy-fields" {% if not account.use_proxy %}style="display:none"{% endif %}>
+          <label class="form-label fw-medium">代理端口</label>
+          <input type="number" class="form-control" name="proxy_port"
+                 value="{{ account.proxy_port or '' }}" placeholder="7890">
+        </div>
+      </div>
+      <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">保存修改</button>
+        <a href="/accounts" class="btn btn-secondary">取消</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('useProxy').addEventListener('change', function() {
+  document.querySelectorAll('.proxy-fields').forEach(el => {
+    el.style.display = this.checked ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source:*)",
+      "Bash(venv/bin/python:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(/Users/apple/Data/workspace/company/tg-mtproto/venv/bin/python:*)",
+      "Bash(/Users/apple/Data/workspace/company/tg-mtproto/venv/bin/pip install:*)"
+    ]
+  }
+}

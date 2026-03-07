@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}渠道管理 - TG MTProto 管理后台{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between">
+  <div>
+    <h4 class="mb-0 fw-bold">渠道管理</h4>
+    <small class="text-muted">渠道是顶层业务单元，账号归属于渠道</small>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+    <i class="bi bi-plus-lg me-1"></i> 添加渠道
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if channels %}
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-4">渠道名称</th>
+          <th>描述</th>
+          <th>账号数</th>
+          <th>创建时间</th>
+          <th class="text-end pe-4">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ch in channels %}
+        <tr>
+          <td class="ps-4 fw-medium">{{ ch.name }}</td>
+          <td class="text-muted small">{{ ch.description or '—' }}</td>
+          <td>
+            <a href="/accounts?channel_id={{ ch.id }}" class="text-decoration-none fw-medium">
+              {{ ch.account_count }} 个账号
+            </a>
+          </td>
+          <td class="text-muted small">{{ ch.created_at[:16] if ch.created_at else '—' }}</td>
+          <td class="text-end pe-4">
+            <!-- Edit inline via modal -->
+            <button class="btn btn-sm btn-icon btn-outline-secondary me-1"
+                    title="编辑"
+                    onclick="openEditModal({{ ch.id }}, '{{ ch.name }}', '{{ ch.description or '' }}')">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-icon btn-outline-danger" title="删除"
+                    onclick="confirmDelete('/channels/{{ ch.id }}/delete',
+                      '确定删除渠道「{{ ch.name }}」？该渠道下的所有账号和群组将一并删除。')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-diagram-3 fs-1 d-block mb-2 opacity-25"></i>
+      暂无渠道
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/channels/add">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">添加渠道</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-medium">渠道名称 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" placeholder="如：客服一号线" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">描述</label>
+            <input type="text" class="form-control" name="description" placeholder="可选">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editForm" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">编辑渠道</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-medium">渠道名称 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="editName" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">描述</label>
+            <input type="text" class="form-control" id="editDesc" name="description">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<form id="deleteForm" method="post" style="display:none"></form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditModal(id, name, desc) {
+  document.getElementById('editForm').action = '/channels/' + id + '/edit';
+  document.getElementById('editName').value = name;
+  document.getElementById('editDesc').value = desc;
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+function confirmDelete(url, msg) {
+  if (confirm(msg)) {
+    const f = document.getElementById('deleteForm');
+    f.action = url; f.submit();
+  }
+}
+</script>
+{% endblock %}

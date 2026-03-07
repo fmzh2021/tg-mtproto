@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量配置（重要！）
+.env
+
+# Telegram 会话文件（包含敏感信息）
+*.session
+*.session-journal
+
+# 数据库文件（可选，根据需要决定是否提交）
+# messages.db
+
+# 日志文件
+*.log
+
+# 导出文件
+export_*.csv
+export_*.json
+messages.csv
+messages.json
+
+# 测试数据库
+test_*.db
+
+# macOS
+.DS_Store
+
+# 临时文件
+*.tmp
+*.bak

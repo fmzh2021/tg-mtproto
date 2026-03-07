@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}账号管理 - TG MTProto 管理后台{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between">
+  <div>
+    <h4 class="mb-0 fw-bold">账号管理</h4>
+    <small class="text-muted">每个账号归属于一个渠道</small>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"
+    {% if not channels %}disabled title="请先创建渠道"{% endif %}>
+    <i class="bi bi-plus-lg me-1"></i> 添加账号
+  </button>
+</div>
+
+{% if not channels %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>
+  请先 <a href="/channels">创建渠道</a>，才能添加账号。
+</div>
+{% endif %}
+
+<!-- Filter bar -->
+<div class="card mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center gap-2 flex-wrap">
+    <span class="text-muted small fw-medium me-1">按渠道筛选：</span>
+    <a href="/accounts"
+       class="btn btn-sm {% if not selected_channel_id %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      全部
+    </a>
+    {% for ch in channels %}
+    <a href="/accounts?channel_id={{ ch.id }}"
+       class="btn btn-sm {% if selected_channel_id == ch.id %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      {{ ch.name }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if accounts %}
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-4">手机号</th>
+          <th>归属渠道</th>
+          <th>Session</th>
+          <th>监控群组</th>
+          <th>状态</th>
+          <th>代理</th>
+          <th>备注</th>
+          <th class="text-end pe-4">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acc in accounts %}
+        <tr>
+          <td class="ps-4 fw-medium">{{ acc.phone }}</td>
+          <td>
+            <span class="badge bg-primary bg-opacity-10 text-primary fw-medium">
+              {{ acc.channel_name }}
+            </span>
+          </td>
+          <td><code class="text-muted small">{{ acc.session_name }}</code></td>
+          <td>
+            <a href="/groups?account_id={{ acc.id }}" class="text-decoration-none fw-medium">
+              {{ acc.chat_count }}
+            </a>
+          </td>
+          <td>
+            <div class="dropdown">
+              <button class="btn btn-sm dropdown-toggle border-0 px-2" data-bs-toggle="dropdown">
+                <span class="badge
+                  {% if acc.status == 'active' %}badge-active
+                  {% elif acc.status == 'error' %}badge-error
+                  {% else %}badge-inactive{% endif %}">
+                  {{ status_labels.get(acc.status, acc.status) }}
+                </span>
+              </button>
+              <ul class="dropdown-menu shadow-sm">
+                <li>
+                  <form method="post" action="/accounts/{{ acc.id }}/status">
+                    <input type="hidden" name="status" value="active">
+                    <button class="dropdown-item text-success" type="submit">
+                      <i class="bi bi-check-circle me-2"></i>运行中
+                    </button>
+                  </form>
+                </li>
+                <li>
+                  <form method="post" action="/accounts/{{ acc.id }}/status">
+                    <input type="hidden" name="status" value="inactive">
+                    <button class="dropdown-item text-secondary" type="submit">
+                      <i class="bi bi-pause-circle me-2"></i>未启动
+                    </button>
+                  </form>
+                </li>
+                <li>
+                  <form method="post" action="/accounts/{{ acc.id }}/status">
+                    <input type="hidden" name="status" value="error">
+                    <button class="dropdown-item text-danger" type="submit">
+                      <i class="bi bi-exclamation-circle me-2"></i>异常
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+          <td>
+            {% if acc.use_proxy %}
+              <span class="text-success small">
+                <i class="bi bi-shield-check"></i> {{ acc.proxy_host }}:{{ acc.proxy_port }}
+              </span>
+            {% else %}
+              <span class="text-muted small">直连</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ acc.note or '—' }}
+          </td>
+          <td class="text-end pe-4">
+            <a href="/accounts/{{ acc.id }}/edit"
+               class="btn btn-sm btn-icon btn-outline-secondary me-1" title="编辑">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <button class="btn btn-sm btn-icon btn-outline-danger" title="删除"
+                    onclick="confirmDelete('/accounts/{{ acc.id }}/delete',
+                      '确定删除账号 {{ acc.phone }}？关联的监控群组也将一并删除。')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-person-plus fs-1 d-block mb-2 opacity-25"></i>
+      暂无账号{% if selected_channel_id %}（该渠道下）{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="/accounts/add">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">添加账号</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-medium">归属渠道 <span class="text-danger">*</span></label>
+              <select class="form-select" name="channel_id" required>
+                <option value="">-- 请选择渠道 --</option>
+                {% for ch in channels %}
+                <option value="{{ ch.id }}"
+                  {% if selected_channel_id == ch.id %}selected{% endif %}>
+                  {{ ch.name }}{% if ch.description %} — {{ ch.description }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">手机号 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="phone" placeholder="+85299999999" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">API ID <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="api_id" placeholder="123456" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">API Hash <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="api_hash" placeholder="abcdef..." required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Session 名称</label>
+              <input type="text" class="form-control" name="session_name" placeholder="留空则自动生成">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">备注</label>
+              <input type="text" class="form-control" name="note" placeholder="可选">
+            </div>
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="use_proxy" id="useProxyAdd">
+                <label class="form-check-label fw-medium" for="useProxyAdd">启用代理</label>
+              </div>
+            </div>
+            <div class="col-md-8 proxy-fields" style="display:none">
+              <label class="form-label fw-medium">代理地址</label>
+              <input type="text" class="form-control" name="proxy_host" placeholder="127.0.0.1">
+            </div>
+            <div class="col-md-4 proxy-fields" style="display:none">
+              <label class="form-label fw-medium">代理端口</label>
+              <input type="number" class="form-control" name="proxy_port" placeholder="7890">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<form id="deleteForm" method="post" style="display:none"></form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmDelete(url, msg) {
+  if (confirm(msg)) {
+    const f = document.getElementById('deleteForm');
+    f.action = url; f.submit();
+  }
+}
+document.getElementById('useProxyAdd').addEventListener('change', function() {
+  document.querySelectorAll('.proxy-fields').forEach(el => {
+    el.style.display = this.checked ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

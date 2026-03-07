@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}概览 - TG MTProto 管理后台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="mb-0 fw-bold">概览</h4>
+  <small class="text-muted">渠道与账号运行状态</small>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+        <i class="bi bi-diagram-3"></i>
+      </div>
+      <div>
+        <div class="fs-3 fw-bold lh-1">{{ stats.total_channels }}</div>
+        <div class="text-muted small mt-1">渠道总数</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon bg-indigo bg-opacity-10" style="background:#ede9fe;color:#6d28d9">
+        <i class="bi bi-person-badge"></i>
+      </div>
+      <div>
+        <div class="fs-3 fw-bold lh-1">{{ stats.total_accounts }}</div>
+        <div class="text-muted small mt-1">账号总数</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon bg-success bg-opacity-10 text-success">
+        <i class="bi bi-check-circle"></i>
+      </div>
+      <div>
+        <div class="fs-3 fw-bold lh-1">{{ stats.active_accounts }}</div>
+        <div class="text-muted small mt-1">运行中账号</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card stat-card p-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+        <i class="bi bi-chat-dots"></i>
+      </div>
+      <div>
+        <div class="fs-3 fw-bold lh-1">{{ stats.active_chats }}</div>
+        <div class="text-muted small mt-1">监控群组</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Channel overview -->
+<div class="card">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-3">
+    <h6 class="mb-0 fw-bold">渠道列表</h6>
+    <a href="/channels" class="btn btn-sm btn-outline-primary">管理渠道</a>
+  </div>
+  <div class="card-body p-0">
+    {% if channels %}
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-4">渠道名称</th>
+          <th>描述</th>
+          <th>账号数</th>
+          <th>创建时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ch in channels %}
+        <tr>
+          <td class="ps-4 fw-medium">
+            <a href="/accounts?channel_id={{ ch.id }}" class="text-decoration-none">{{ ch.name }}</a>
+          </td>
+          <td class="text-muted small">{{ ch.description or '—' }}</td>
+          <td>
+            <a href="/accounts?channel_id={{ ch.id }}" class="text-decoration-none fw-medium">
+              {{ ch.account_count }}
+            </a>
+          </td>
+          <td class="text-muted small">{{ ch.created_at[:16] if ch.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-diagram-3 fs-1 d-block mb-2 opacity-25"></i>
+      暂无渠道，<a href="/channels">前往添加</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
