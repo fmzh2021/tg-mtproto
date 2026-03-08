@@ -28,6 +28,7 @@ class AdminDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
                 description TEXT,
+                webhook_url TEXT,
                 status TEXT DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -68,15 +69,34 @@ class AdminDatabase:
             )
         ''')
 
+        # 消息记录
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                chat_id INTEGER NOT NULL,
+                chat_name TEXT,
+                chat_type TEXT,
+                sender_id INTEGER,
+                sender_name TEXT,
+                sender_username TEXT,
+                text TEXT,
+                date TIMESTAMP,
+                direction TEXT DEFAULT 'in',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            )
+        ''')
+
         self.conn.commit()
 
     def _migrate(self):
-        """兼容旧版 accounts 表（无 channel_id 列）"""
         cursor = self.conn.cursor()
+
+        # 兼容旧版 accounts 表（无 channel_id 列）
         cursor.execute("PRAGMA table_info(accounts)")
-        cols = [row[1] for row in cursor.fetchall()]
-        if 'channel_id' not in cols:
-            # 插入一个默认渠道，把旧账号挂到它下面
+        acc_cols = [row[1] for row in cursor.fetchall()]
+        if 'channel_id' not in acc_cols:
             cursor.execute(
                 "INSERT OR IGNORE INTO channels (name, description) VALUES ('默认渠道', '迁移自旧版本')"
             )
@@ -85,6 +105,13 @@ class AdminDatabase:
             cursor.execute(
                 f"ALTER TABLE accounts ADD COLUMN channel_id INTEGER DEFAULT {default_id}"
             )
+            self.conn.commit()
+
+        # 兼容旧版 channels 表（无 webhook_url 列）
+        cursor.execute("PRAGMA table_info(channels)")
+        ch_cols = [row[1] for row in cursor.fetchall()]
+        if 'webhook_url' not in ch_cols:
+            cursor.execute("ALTER TABLE channels ADD COLUMN webhook_url TEXT")
             self.conn.commit()
 
     # ── Channels ───────────────────────────────────────────────────────────────
@@ -107,20 +134,20 @@ class AdminDatabase:
         row = cursor.fetchone()
         return dict(row) if row else None
 
-    def add_channel(self, name: str, description: str = None) -> int:
+    def add_channel(self, name: str, description: str = None, webhook_url: str = None) -> int:
         cursor = self.conn.cursor()
         cursor.execute(
-            'INSERT INTO channels (name, description) VALUES (?, ?)',
-            (name.strip(), description or None)
+            'INSERT INTO channels (name, description, webhook_url) VALUES (?, ?, ?)',
+            (name.strip(), description or None, webhook_url or None)
         )
         self.conn.commit()
         return cursor.lastrowid
 
-    def update_channel(self, channel_id: int, name: str, description: str = None):
+    def update_channel(self, channel_id: int, name: str, description: str = None, webhook_url: str = None):
         cursor = self.conn.cursor()
         cursor.execute(
-            'UPDATE channels SET name=?, description=? WHERE id=?',
-            (name.strip(), description or None, channel_id)
+            'UPDATE channels SET name=?, description=?, webhook_url=? WHERE id=?',
+            (name.strip(), description or None, webhook_url or None, channel_id)
         )
         self.conn.commit()
 
@@ -159,11 +186,22 @@ class AdminDatabase:
     def get_account(self, account_id: int) -> Optional[dict]:
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT a.*, c.name AS channel_name
+            SELECT a.*, c.name AS channel_name, c.webhook_url AS channel_webhook_url
             FROM accounts a
             JOIN channels c ON a.channel_id = c.id
             WHERE a.id=?
         ''', (account_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_account_by_phone(self, phone: str) -> Optional[dict]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT a.*, c.name AS channel_name, c.webhook_url AS channel_webhook_url
+            FROM accounts a
+            JOIN channels c ON a.channel_id = c.id
+            WHERE a.phone=?
+        ''', (phone,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
@@ -211,6 +249,37 @@ class AdminDatabase:
         cursor.execute('DELETE FROM accounts WHERE id=?', (account_id,))
         self.conn.commit()
 
+    # ── Messages ───────────────────────────────────────────────────────────────
+
+    def save_message(self, account_id: int, chat_id: int, chat_name: str,
+                     chat_type: str, sender_id: int, sender_name: str,
+                     sender_username: str, text: str, date, direction: str = 'in'):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT INTO messages
+                (account_id, chat_id, chat_name, chat_type, sender_id,
+                 sender_name, sender_username, text, date, direction)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (account_id, chat_id, chat_name, chat_type, sender_id,
+              sender_name, sender_username, text, date, direction))
+        self.conn.commit()
+
+    def get_messages(self, account_id: int = None, chat_id: int = None,
+                     limit: int = 100) -> List[dict]:
+        cursor = self.conn.cursor()
+        query = 'SELECT * FROM messages WHERE 1=1'
+        params = []
+        if account_id is not None:
+            query += ' AND account_id=?'
+            params.append(account_id)
+        if chat_id is not None:
+            query += ' AND chat_id=?'
+            params.append(chat_id)
+        query += ' ORDER BY date DESC LIMIT ?'
+        params.append(limit)
+        cursor.execute(query, params)
+        return [dict(row) for row in cursor.fetchall()]
+
     # ── Monitored chats ────────────────────────────────────────────────────────
 
     def get_chats(self, account_id: int = None, channel_id: int = None) -> List[dict]:
@@ -242,6 +311,22 @@ class AdminDatabase:
                 ORDER BY mc.created_at DESC
             ''')
         return [dict(row) for row in cursor.fetchall()]
+
+    def ensure_monitored_chat(self, account_id: int, chat_id: int,
+                              chat_name: str, chat_type: str):
+        """收到消息时自动将该聊天加入监控列表（已存在则跳过）。"""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'SELECT id FROM monitored_chats WHERE account_id=? AND chat_id=?',
+            (account_id, chat_id)
+        )
+        if cursor.fetchone() is None:
+            cursor.execute('''
+                INSERT OR IGNORE INTO monitored_chats
+                    (account_id, chat_id, chat_name, chat_type)
+                VALUES (?, ?, ?, ?)
+            ''', (account_id, chat_id, chat_name or str(chat_id), chat_type or 'unknown'))
+            self.conn.commit()
 
     def add_chat(self, account_id: int, chat_name: str,
                  chat_id: int = None, chat_type: str = None) -> int:

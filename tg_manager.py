@@ -39,10 +39,11 @@ class ClientSession:
 
 
 class TelegramClientManager:
-    def __init__(self):
+    def __init__(self, message_callback=None):
         self.sessions: dict[str, ClientSession] = {}
         self.channels: dict[str, str] = {}         # channel_id → webhook_url
         self.account_channels: dict[str, str] = {} # phone → channel_id
+        self.message_callback = message_callback   # async (phone, message) → None
         self._load_channels()
 
     def _load_channels(self):
@@ -89,8 +90,10 @@ class TelegramClientManager:
 
     def _make_client(self, phone: str, api_id: int, api_hash: str) -> TelegramClient:
         proxy = None
+        logger.info("Use Proxy: %s", config.USE_PROXY)
         if config.USE_PROXY:
-            proxy = (socks.SOCKS5, config.PROXY_HOST, config.PROXY_PORT)
+            proxy = ("socks5", config.PROXY_HOST, config.PROXY_PORT)
+            logger.info("use proxy: %s://%s:%s","socks5", config.PROXY_HOST, config.PROXY_PORT)
         return TelegramClient(
             self._session_path(phone),
             api_id,
@@ -180,11 +183,19 @@ class TelegramClientManager:
         """Attach a NewMessage event handler to the client."""
         client = session.client
 
-        # Remove previous handlers to avoid duplicates on reconnect
-        client.remove_event_handler(None)
+        # Clear all existing handlers to avoid duplicates on reconnect
+        client._event_builders.clear()
 
         @client.on(events.NewMessage)
         async def handler(event):
+            logger.info("New message for %s: chat_id=%s text=%r",
+                        phone, event.message.chat_id,
+                        (event.message.text or "")[:80])
+            if self.message_callback:
+                try:
+                    await self.message_callback(phone, event.message)
+                except Exception as exc:
+                    logger.warning("message_callback error for %s: %s", phone, exc)
             await self._fire_webhook(phone, event.message)
 
     async def send_message(self, phone: str, peer: str, text: str) -> Message:
@@ -215,7 +226,9 @@ class TelegramClientManager:
         elif session.webhook_url:
             webhook_url = session.webhook_url
         else:
-            return  # no webhook configured
+            logger.warning("No webhook configured for %s, message dropped (chat_id=%s)",
+                           phone, message.chat_id)
+            return
 
         try:
             chat = await message.get_chat()

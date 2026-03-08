@@ -69,42 +69,13 @@
             </a>
           </td>
           <td>
-            <div class="dropdown">
-              <button class="btn btn-sm dropdown-toggle border-0 px-2" data-bs-toggle="dropdown">
-                <span class="badge
-                  {% if acc.status == 'active' %}badge-active
-                  {% elif acc.status == 'error' %}badge-error
-                  {% else %}badge-inactive{% endif %}">
-                  {{ status_labels.get(acc.status, acc.status) }}
-                </span>
-              </button>
-              <ul class="dropdown-menu shadow-sm">
-                <li>
-                  <form method="post" action="/accounts/{{ acc.id }}/status">
-                    <input type="hidden" name="status" value="active">
-                    <button class="dropdown-item text-success" type="submit">
-                      <i class="bi bi-check-circle me-2"></i>运行中
-                    </button>
-                  </form>
-                </li>
-                <li>
-                  <form method="post" action="/accounts/{{ acc.id }}/status">
-                    <input type="hidden" name="status" value="inactive">
-                    <button class="dropdown-item text-secondary" type="submit">
-                      <i class="bi bi-pause-circle me-2"></i>未启动
-                    </button>
-                  </form>
-                </li>
-                <li>
-                  <form method="post" action="/accounts/{{ acc.id }}/status">
-                    <input type="hidden" name="status" value="error">
-                    <button class="dropdown-item text-danger" type="submit">
-                      <i class="bi bi-exclamation-circle me-2"></i>异常
-                    </button>
-                  </form>
-                </li>
-              </ul>
-            </div>
+            <span class="badge
+              {% if acc.status == 'active' %}badge-active
+              {% elif acc.status == 'error' %}badge-error
+              {% elif acc.status == 'pending' %}bg-warning text-dark
+              {% else %}badge-inactive{% endif %}">
+              {{ status_labels.get(acc.status, acc.status) }}
+            </span>
           </td>
           <td>
             {% if acc.use_proxy %}
@@ -119,13 +90,19 @@
             {{ acc.note or '—' }}
           </td>
           <td class="text-end pe-4">
+            {% if acc.status in ('pending', 'inactive', 'error') %}
+            <a href="/accounts/{{ acc.id }}/verify"
+               class="btn btn-sm btn-icon btn-outline-success me-1" title="验证登录">
+              <i class="bi bi-shield-check"></i>
+            </a>
+            {% endif %}
             <a href="/accounts/{{ acc.id }}/edit"
                class="btn btn-sm btn-icon btn-outline-secondary me-1" title="编辑">
               <i class="bi bi-pencil"></i>
             </a>
             <button class="btn btn-sm btn-icon btn-outline-danger" title="删除"
                     onclick="confirmDelete('/accounts/{{ acc.id }}/delete',
-                      '确定删除账号 {{ acc.phone }}？关联的监控群组也将一并删除。')">
+                      '确定删除账号 {{ acc.phone }}？关联的监控群组也将一并删除，在线连接将被断开。')">
               <i class="bi bi-trash"></i>
             </button>
           </td>
@@ -152,6 +129,10 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="alert alert-info py-2 small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            保存后将立即向该手机号发送 Telegram 验证码，请在下一步填写。
+          </div>
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label fw-medium">归属渠道 <span class="text-danger">*</span></label>
@@ -203,7 +184,9 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send me-1"></i>发送验证码
+          </button>
         </div>
       </form>
     </div>

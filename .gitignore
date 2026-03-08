@@ -39,8 +39,10 @@ env/
 *.session
 *.session-journal
 
-# 数据库文件（可选，根据需要决定是否提交）
+# 数据库文件
 # messages.db
+admin.db
+*.db
 
 # 日志文件
 *.log

@@ -81,6 +81,12 @@
           </td>
           <td class="text-muted small">{{ chat.created_at[:16] if chat.created_at else '—' }}</td>
           <td class="text-end pe-4">
+            {% if chat.chat_id %}
+            <a href="/messages?account_id={{ chat.account_id }}&chat_id={{ chat.chat_id }}"
+               class="btn btn-sm btn-icon btn-outline-primary me-1" title="查看消息">
+              <i class="bi bi-chat-text"></i>
+            </a>
+            {% endif %}
             <form method="post" action="/groups/{{ chat.id }}/toggle" class="d-inline">
               <input type="hidden" name="enabled" value="{{ '0' if chat.enabled else '1' }}">
               <button type="submit"

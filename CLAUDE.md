@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Telegram chat message synchronization tool using the MTProto protocol (via Telethon). Designed for customer service chat monitoring and compliance auditing. Syncs historical and real-time messages into a local SQLite database with search/export capabilities.
+A multi-account Telegram monitoring service using the MTProto protocol (via Telethon). Designed for customer service chat monitoring and compliance auditing. Exposes an HTTP API for account management and real-time message forwarding via webhooks.
 
 ## Setup
 
@@ -16,25 +16,26 @@ cp .env.example .env  # then fill in API credentials
 ```
 
 Required `.env` variables:
-- `API_ID` — from https://my.telegram.org/apps
-- `API_HASH` — from https://my.telegram.org/apps
-- `PHONE` — your Telegram phone number (with country code)
-
-First run requires interactive phone verification code entry.
+- `API_ID` — from https://my.telegram.org/apps (default fallback)
+- `API_HASH` — from https://my.telegram.org/apps (default fallback)
+- `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` — optional SOCKS5 proxy
 
 ## Running
 
 ```bash
-python main.py          # full sync + real-time monitoring
-python query_messages.py  # search and export stored messages
-python quick_start.py   # minimal connection test
+# HTTP API service (multi-account)
+python server.py
+# or
+uvicorn server:app --host 0.0.0.0 --port 8000
+
+# Admin web UI (configuration management)
+python admin_app.py
 ```
 
 ## Tests
 
 ```bash
-python test_basic.py    # database operations (no Telegram connection needed)
-python test_proxy.py    # proxy configuration
+python test_proxy.py    # proxy configuration check
 ```
 
 ## Architecture
@@ -42,20 +43,21 @@ python test_proxy.py    # proxy configuration
 | Module | Responsibility |
 |--------|---------------|
 | `config.py` | Loads `.env` vars via python-dotenv |
-| `message_storage.py` | `MessageDatabase` class — SQLite CRUD for messages/users/chats |
-| `main.py` | `sync_all_messages()`, `handle_new_message()` — Telethon client, async event loop |
-| `query_messages.py` | `MessageQuery` class — keyword/sender/date search, CSV/JSON export |
+| `tg_manager.py` | `TelegramClientManager` — multi-account Telethon lifecycle, login, webhook dispatch |
+| `server.py` | FastAPI HTTP API — auth, messaging, webhook registration, channel management |
+| `admin_app.py` | FastAPI web admin UI — channels/accounts/monitored groups CRUD |
+| `admin_db.py` | `AdminDatabase` — SQLite CRUD for `admin.db` (channels → accounts → monitored_chats) |
 
-**Data flow:** `.env` → Telethon client → dialogs → messages → SQLite (`messages.db`)
+**Data flow:** HTTP request → `server.py` → `tg_manager.py` → Telegram MTProto → webhook POST
 
-**Database tables:** `messages`, `users`, `chats`
+**Hierarchy:** Channel (渠道) → Account (账号) → Monitored Chat (监控群组)
 
 **Async pattern:** all Telegram API calls use `async/await` with `asyncio`.
 
 ## Key Files
 
-- `messages.db` — SQLite database (runtime, git-ignored)
-- `*.session` — Telethon session files (contain auth tokens, git-ignored)
+- `admin.db` — SQLite config database (runtime, git-ignored)
+- `sessions/` — Telethon session files per account (contain auth tokens, git-ignored)
 - `.env` — credentials (git-ignored)
 
 ## Proxy Support

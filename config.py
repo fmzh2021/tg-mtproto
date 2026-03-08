@@ -17,5 +17,5 @@ SESSION_NAME = os.getenv("SESSION_NAME", "customer_service_sync")
 
 # 代理配置
 PROXY_HOST = os.getenv("PROXY_HOST", "127.0.0.1")
-PROXY_PORT = int(os.getenv("PROXY_PORT", "7890"))
-USE_PROXY = os.getenv("USE_PROXY", "false").lower() == "true"
+PROXY_PORT = int(os.getenv("PROXY_PORT", "10808"))
+USE_PROXY = os.getenv("USE_PROXY", "true").lower() == "true"

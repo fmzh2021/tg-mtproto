@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}验证登录 - TG MTProto 管理后台{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="mb-0 fw-bold">验证登录</h4>
+  <small class="text-muted">{{ account.phone }}</small>
+</div>
+
+<div class="card" style="max-width:480px">
+  <div class="card-body p-4">
+    <p class="text-muted mb-4">
+      验证码已发送到 <strong>{{ account.phone }}</strong>，请在 Telegram 客户端查收并填写。
+    </p>
+
+    <form method="post" action="/accounts/{{ account.id }}/verify">
+      <div class="mb-3">
+        <label class="form-label fw-medium">验证码 <span class="text-danger">*</span></label>
+        <input type="text" class="form-control form-control-lg text-center"
+               name="code" placeholder="12345" autocomplete="one-time-code"
+               autofocus required style="letter-spacing:.3em;font-size:1.4rem">
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-medium">两步验证密码</label>
+        <input type="password" class="form-control" name="password"
+               placeholder="未开启则留空">
+        <div class="form-text">仅当账号开启了两步验证时才需填写。</div>
+      </div>
+      <div class="d-grid">
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="bi bi-shield-check me-2"></i>确认登录
+        </button>
+      </div>
+    </form>
+
+    <hr class="my-4">
+
+    <div class="d-flex align-items-center justify-content-between">
+      <span class="text-muted small">没有收到验证码？</span>
+      <form method="post" action="/accounts/{{ account.id }}/send_code">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise me-1"></i>重新发送
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="mt-3">
+  <a href="/accounts" class="text-muted small">
+    <i class="bi bi-arrow-left me-1"></i>返回账号列表
+  </a>
+</div>
+{% endblock %}

@@ -20,6 +20,7 @@
         <tr>
           <th class="ps-4">渠道名称</th>
           <th>描述</th>
+          <th>Webhook</th>
           <th>账号数</th>
           <th>创建时间</th>
           <th class="text-end pe-4">操作</th>
@@ -30,6 +31,15 @@
         <tr>
           <td class="ps-4 fw-medium">{{ ch.name }}</td>
           <td class="text-muted small">{{ ch.description or '—' }}</td>
+          <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {% if ch.webhook_url %}
+              <span class="text-success" title="{{ ch.webhook_url }}">
+                <i class="bi bi-link-45deg"></i> {{ ch.webhook_url }}
+              </span>
+            {% else %}
+              <span class="text-muted">未配置</span>
+            {% endif %}
+          </td>
           <td>
             <a href="/accounts?channel_id={{ ch.id }}" class="text-decoration-none fw-medium">
               {{ ch.account_count }} 个账号
@@ -37,15 +47,14 @@
           </td>
           <td class="text-muted small">{{ ch.created_at[:16] if ch.created_at else '—' }}</td>
           <td class="text-end pe-4">
-            <!-- Edit inline via modal -->
             <button class="btn btn-sm btn-icon btn-outline-secondary me-1"
                     title="编辑"
-                    onclick="openEditModal({{ ch.id }}, '{{ ch.name }}', '{{ ch.description or '' }}')">
+                    onclick="openEditModal({{ ch.id }}, '{{ ch.name }}', '{{ ch.description or '' }}', '{{ ch.webhook_url or '' }}')">
               <i class="bi bi-pencil"></i>
             </button>
             <button class="btn btn-sm btn-icon btn-outline-danger" title="删除"
                     onclick="confirmDelete('/channels/{{ ch.id }}/delete',
-                      '确定删除渠道「{{ ch.name }}」？该渠道下的所有账号和群组将一并删除。')">
+                      '确定删除渠道「{{ ch.name }}」？该渠道下的所有账号和群组将一并删除，在线账号将被断开。')">
               <i class="bi bi-trash"></i>
             </button>
           </td>
@@ -80,6 +89,12 @@
             <label class="form-label fw-medium">描述</label>
             <input type="text" class="form-control" name="description" placeholder="可选">
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Webhook URL</label>
+            <input type="url" class="form-control" name="webhook_url"
+                   placeholder="https://your-server.com/webhook">
+            <div class="form-text">新消息将以 POST JSON 形式推送到此地址。</div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -108,6 +123,12 @@
             <label class="form-label fw-medium">描述</label>
             <input type="text" class="form-control" id="editDesc" name="description">
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Webhook URL</label>
+            <input type="url" class="form-control" id="editWebhook" name="webhook_url"
+                   placeholder="https://your-server.com/webhook">
+            <div class="form-text">保存后将立即同步到该渠道下所有在线账号。</div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -123,10 +144,11 @@
 
 {% block scripts %}
 <script>
-function openEditModal(id, name, desc) {
+function openEditModal(id, name, desc, webhook) {
   document.getElementById('editForm').action = '/channels/' + id + '/edit';
   document.getElementById('editName').value = name;
   document.getElementById('editDesc').value = desc;
+  document.getElementById('editWebhook').value = webhook;
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 function confirmDelete(url, msg) {

@@ -1,49 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-FastAPI HTTP service exposing Telegram login, messaging, and webhook registration.
+FastAPI APIRouter — Telegram 登录、发消息、Webhook 注册、渠道管理。
 
-Run:
-    python server.py
-    uvicorn server:app --host 0.0.0.0 --port 8000
+本模块不独立运行，由 admin_app.py 挂载。
+路由前缀：/api
 """
-import asyncio
 import logging
-from contextlib import asynccontextmanager
-from pathlib import Path
 
-import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from tg_manager import TelegramClientManager, SESSIONS_DIR
-import config
+from tg_manager import TelegramClientManager
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-manager = TelegramClientManager()
+router = APIRouter(prefix="/api", tags=["API"])
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: reconnect sessions that already have saved session files
-    for session_file in SESSIONS_DIR.glob("*.session"):
-        phone = "_" + session_file.stem  # stems are like _85295523742
-        # Convert sanitized name back to phone format
-        phone = session_file.stem.replace("_", "+", 1)  # first _ → +
-        try:
-            await manager.reconnect(phone)
-            logger.info("Auto-reconnected session: %s", phone)
-        except Exception as exc:
-            logger.warning("Could not reconnect %s: %s", phone, exc)
+# ---------------------------------------------------------------------------
+# 依赖：从 app.state 获取共享 manager 实例
+# ---------------------------------------------------------------------------
 
-    yield
-
-    # Shutdown: disconnect all clients
-    await manager.shutdown()
-
-
-app = FastAPI(title="TG MTProto HTTP Service", lifespan=lifespan)
+def get_manager(request: Request) -> TelegramClientManager:
+    return request.app.state.manager
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +51,7 @@ class SendCodeRequest(BaseModel):
     phone: str
     api_id: int | None = None
     api_hash: str | None = None
-    channel_id: str | None = None   # auto-assign channel at login time
+    channel_id: str | None = None
 
 
 class SendCodeResponse(BaseModel):
@@ -116,8 +95,8 @@ class RegisterWebhookResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@app.post("/auth/send_code", response_model=SendCodeResponse)
-async def send_code(req: SendCodeRequest):
+@router.post("/auth/send_code", response_model=SendCodeResponse)
+async def send_code(req: SendCodeRequest, manager: TelegramClientManager = Depends(get_manager)):
     try:
         phone_code_hash = await manager.send_code(req.phone, req.api_id, req.api_hash, req.channel_id)
     except Exception as exc:
@@ -126,8 +105,8 @@ async def send_code(req: SendCodeRequest):
     return SendCodeResponse(status="code_sent", phone_code_hash=phone_code_hash)
 
 
-@app.post("/auth/sign_in", response_model=SignInResponse)
-async def sign_in(req: SignInRequest):
+@router.post("/auth/sign_in", response_model=SignInResponse)
+async def sign_in(req: SignInRequest, manager: TelegramClientManager = Depends(get_manager)):
     try:
         user = await manager.sign_in(req.phone, req.code, req.password)
     except ValueError as exc:
@@ -142,8 +121,8 @@ async def sign_in(req: SignInRequest):
     )
 
 
-@app.post("/messages/send", response_model=SendMessageResponse)
-async def send_message(req: SendMessageRequest):
+@router.post("/messages/send", response_model=SendMessageResponse)
+async def send_message(req: SendMessageRequest, manager: TelegramClientManager = Depends(get_manager)):
     try:
         message = await manager.send_message(req.phone, req.peer, req.text)
     except ValueError as exc:
@@ -154,8 +133,8 @@ async def send_message(req: SendMessageRequest):
     return SendMessageResponse(status="ok", message_id=message.id)
 
 
-@app.post("/webhook/register", response_model=RegisterWebhookResponse)
-async def register_webhook(req: RegisterWebhookRequest):
+@router.post("/webhook/register", response_model=RegisterWebhookResponse)
+async def register_webhook(req: RegisterWebhookRequest, manager: TelegramClientManager = Depends(get_manager)):
     try:
         manager.register_webhook(req.phone, req.webhook_url)
     except ValueError as exc:
@@ -163,24 +142,16 @@ async def register_webhook(req: RegisterWebhookRequest):
     return RegisterWebhookResponse(status="ok")
 
 
-@app.post("/channel/create", response_model=CreateChannelResponse)
-async def create_channel(req: CreateChannelRequest):
+@router.post("/channel/create", response_model=CreateChannelResponse)
+async def create_channel(req: CreateChannelRequest, manager: TelegramClientManager = Depends(get_manager)):
     channel_id = manager.create_channel(req.webhook_url)
     return CreateChannelResponse(status="ok", channel_id=channel_id)
 
 
-@app.post("/channel/assign", response_model=AssignChannelResponse)
-async def assign_channel(req: AssignChannelRequest):
+@router.post("/channel/assign", response_model=AssignChannelResponse)
+async def assign_channel(req: AssignChannelRequest, manager: TelegramClientManager = Depends(get_manager)):
     try:
         manager.assign_channel(req.phone, req.channel_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return AssignChannelResponse(status="ok")
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False)
