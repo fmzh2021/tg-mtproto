@@ -73,8 +73,9 @@ manager = TelegramClientManager(message_callback=on_new_message)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 将 manager 挂到 app.state，供 API 路由通过依赖注入获取
+    # 将 manager 和 db 挂到 app.state，供 API 路由通过依赖注入获取
     app.state.manager = manager
+    app.state.db = db
 
     # 启动时重连所有 active 账号
     for account in db.get_accounts():
@@ -149,12 +150,16 @@ async def add_channel(
     name: str = Form(...),
     description: str = Form(default=""),
     webhook_url: str = Form(default=""),
+    api_id: str = Form(default=""),
+    api_hash: str = Form(default=""),
 ):
     try:
         db.add_channel(
             name=name.strip(),
             description=description.strip() or None,
             webhook_url=webhook_url.strip() or None,
+            api_id=api_id.strip() or None,
+            api_hash=api_hash.strip() or None,
         )
         return RedirectResponse("/channels?msg=渠道添加成功&msg_type=success", status_code=303)
     except Exception as e:
@@ -167,6 +172,8 @@ async def edit_channel(
     name: str = Form(...),
     description: str = Form(default=""),
     webhook_url: str = Form(default=""),
+    api_id: str = Form(default=""),
+    api_hash: str = Form(default=""),
 ):
     try:
         new_webhook = webhook_url.strip() or None
@@ -175,6 +182,8 @@ async def edit_channel(
             name=name.strip(),
             description=description.strip() or None,
             webhook_url=new_webhook,
+            api_id=api_id.strip() or None,
+            api_hash=api_hash.strip() or None,
         )
         # 同步更新该渠道下所有在线账号的 webhook
         if new_webhook:

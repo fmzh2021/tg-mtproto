@@ -20,6 +20,7 @@
         <tr>
           <th class="ps-4">渠道名称</th>
           <th>描述</th>
+          <th>App ID</th>
           <th>Webhook</th>
           <th>账号数</th>
           <th>创建时间</th>
@@ -31,6 +32,15 @@
         <tr>
           <td class="ps-4 fw-medium">{{ ch.name }}</td>
           <td class="text-muted small">{{ ch.description or '—' }}</td>
+          <td class="small">
+            {% if ch.app_id %}
+            <code class="text-primary" style="font-size:0.75rem">{{ ch.app_id }}</code>
+            <button class="btn btn-link btn-sm p-0 ms-1 text-muted copy-btn"
+                    data-value="{{ ch.app_id }}" title="复制" style="vertical-align:baseline">
+              <i class="bi bi-copy"></i>
+            </button>
+            {% else %}—{% endif %}
+          </td>
           <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             {% if ch.webhook_url %}
               <span class="text-success" title="{{ ch.webhook_url }}">
@@ -49,7 +59,7 @@
           <td class="text-end pe-4">
             <button class="btn btn-sm btn-icon btn-outline-secondary me-1"
                     title="编辑"
-                    onclick="openEditModal({{ ch.id }}, '{{ ch.name }}', '{{ ch.description or '' }}', '{{ ch.webhook_url or '' }}')">
+                    onclick="openEditModal({{ ch.id }}, '{{ ch.name }}', '{{ ch.description or '' }}', '{{ ch.webhook_url or '' }}', '{{ ch.api_id or '' }}', '{{ ch.api_hash or '' }}')">
               <i class="bi bi-pencil"></i>
             </button>
             <button class="btn btn-sm btn-icon btn-outline-danger" title="删除"
@@ -95,6 +105,17 @@
                    placeholder="https://your-server.com/webhook">
             <div class="form-text">新消息将以 POST JSON 形式推送到此地址。</div>
           </div>
+          <div class="row g-2">
+            <div class="col">
+              <label class="form-label fw-medium">API ID</label>
+              <input type="number" class="form-control" name="api_id" placeholder="留空使用全局配置">
+            </div>
+            <div class="col">
+              <label class="form-label fw-medium">API Hash</label>
+              <input type="text" class="form-control" name="api_hash" placeholder="留空使用全局配置">
+            </div>
+          </div>
+          <div class="form-text mb-2">不填则使用服务器全局 API 凭证。</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -129,6 +150,17 @@
                    placeholder="https://your-server.com/webhook">
             <div class="form-text">保存后将立即同步到该渠道下所有在线账号。</div>
           </div>
+          <div class="row g-2">
+            <div class="col">
+              <label class="form-label fw-medium">API ID</label>
+              <input type="number" class="form-control" id="editApiId" name="api_id" placeholder="留空使用全局配置">
+            </div>
+            <div class="col">
+              <label class="form-label fw-medium">API Hash</label>
+              <input type="text" class="form-control" id="editApiHash" name="api_hash" placeholder="留空使用全局配置">
+            </div>
+          </div>
+          <div class="form-text mb-2">不填则使用服务器全局 API 凭证。</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -144,11 +176,13 @@
 
 {% block scripts %}
 <script>
-function openEditModal(id, name, desc, webhook) {
+function openEditModal(id, name, desc, webhook, apiId, apiHash) {
   document.getElementById('editForm').action = '/channels/' + id + '/edit';
   document.getElementById('editName').value = name;
   document.getElementById('editDesc').value = desc;
   document.getElementById('editWebhook').value = webhook;
+  document.getElementById('editApiId').value = apiId;
+  document.getElementById('editApiHash').value = apiHash;
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 function confirmDelete(url, msg) {
@@ -157,5 +191,27 @@ function confirmDelete(url, msg) {
     f.action = url; f.submit();
   }
 }
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const value = btn.dataset.value;
+    const icon = btn.querySelector('i');
+    const done = () => {
+      icon.className = 'bi bi-check-lg text-success';
+      setTimeout(() => { icon.className = 'bi bi-copy'; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(done);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    }
+  });
+});
 </script>
 {% endblock %}

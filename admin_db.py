@@ -4,6 +4,7 @@
 层级：渠道 → 账号 → 监控群组
 """
 import sqlite3
+import uuid
 from datetime import datetime
 from typing import List, Optional
 
@@ -26,9 +27,12 @@ class AdminDatabase:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS channels (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                app_id TEXT UNIQUE NOT NULL,
                 name TEXT UNIQUE NOT NULL,
                 description TEXT,
                 webhook_url TEXT,
+                api_id TEXT,
+                api_hash TEXT,
                 status TEXT DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -107,11 +111,27 @@ class AdminDatabase:
             )
             self.conn.commit()
 
-        # 兼容旧版 channels 表（无 webhook_url 列）
+        # 兼容旧版 channels 表（逐列检测并补充）
         cursor.execute("PRAGMA table_info(channels)")
         ch_cols = [row[1] for row in cursor.fetchall()]
         if 'webhook_url' not in ch_cols:
             cursor.execute("ALTER TABLE channels ADD COLUMN webhook_url TEXT")
+            self.conn.commit()
+        if 'api_id' not in ch_cols:
+            cursor.execute("ALTER TABLE channels ADD COLUMN api_id TEXT")
+            self.conn.commit()
+        if 'api_hash' not in ch_cols:
+            cursor.execute("ALTER TABLE channels ADD COLUMN api_hash TEXT")
+            self.conn.commit()
+        if 'app_id' not in ch_cols:
+            cursor.execute("ALTER TABLE channels ADD COLUMN app_id TEXT")
+            # 为已有渠道自动生成 app_id
+            cursor.execute("SELECT id FROM channels WHERE app_id IS NULL")
+            for row in cursor.fetchall():
+                cursor.execute(
+                    "UPDATE channels SET app_id=? WHERE id=?",
+                    (str(uuid.uuid4()), row[0])
+                )
             self.conn.commit()
 
     # ── Channels ───────────────────────────────────────────────────────────────
@@ -134,20 +154,30 @@ class AdminDatabase:
         row = cursor.fetchone()
         return dict(row) if row else None
 
-    def add_channel(self, name: str, description: str = None, webhook_url: str = None) -> int:
+    def get_channel_by_app_id(self, app_id: str) -> Optional[dict]:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM channels WHERE app_id=?', (app_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def add_channel(self, name: str, description: str = None, webhook_url: str = None,
+                    api_id: str = None, api_hash: str = None) -> int:
         cursor = self.conn.cursor()
         cursor.execute(
-            'INSERT INTO channels (name, description, webhook_url) VALUES (?, ?, ?)',
-            (name.strip(), description or None, webhook_url or None)
+            'INSERT INTO channels (app_id, name, description, webhook_url, api_id, api_hash) VALUES (?, ?, ?, ?, ?, ?)',
+            (str(uuid.uuid4()), name.strip(), description or None,
+             webhook_url or None, api_id or None, api_hash or None)
         )
         self.conn.commit()
         return cursor.lastrowid
 
-    def update_channel(self, channel_id: int, name: str, description: str = None, webhook_url: str = None):
+    def update_channel(self, channel_id: int, name: str, description: str = None,
+                       webhook_url: str = None, api_id: str = None, api_hash: str = None):
         cursor = self.conn.cursor()
         cursor.execute(
-            'UPDATE channels SET name=?, description=?, webhook_url=? WHERE id=?',
-            (name.strip(), description or None, webhook_url or None, channel_id)
+            'UPDATE channels SET name=?, description=?, webhook_url=?, api_id=?, api_hash=? WHERE id=?',
+            (name.strip(), description or None, webhook_url or None,
+             api_id or None, api_hash or None, channel_id)
         )
         self.conn.commit()
 
